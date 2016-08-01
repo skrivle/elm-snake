@@ -1,4 +1,4 @@
-module Matrix exposing (matrix, Matrix, set, width)
+module Matrix exposing (matrix, Matrix, set, width, height)
 
 import Array exposing (Array)
 
@@ -50,9 +50,9 @@ map cellFn matrix =
         indexedMap cellFnWrapper matrix 
 
 
- 
-
-
 width matrix =
     Maybe.withDefault (Array.fromList []) (Array.get 0 matrix)
         |> Array.length
+
+height matrix = 
+    Array.length matrix
