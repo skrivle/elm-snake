@@ -1,43 +1,38 @@
 import Html exposing (..)
 import Html.Attributes exposing (..)
-import Html.Events exposing (onClick, onInput)
 import Html.App as App
 import Matrix
 import Array
-import Debug
+import Time exposing (Time, second)
+import Keyboard
+import Random
 
-type Msg = DIR
+type Msg = Tick Time | Key Int | NewFood (Int, Int)
 
 type DIR = DOWN | UP | LEFT | RIGHT
 
+type MatrixItem = SNAKE | FOOD
+
+type alias SnakePart = 
+  { x : Int
+  , y : Int
+  }
+
+keyCodeToDir keyCode =
+  case keyCode of
+    40 -> Maybe.Just DOWN
+    38 -> Maybe.Just UP
+    37 -> Maybe.Just LEFT
+    39 -> Maybe.Just RIGHT
+    _ -> Maybe.Nothing
+
 myMatrix =
-    (Matrix.matrix 0 20 20)
+    (Matrix.matrix Maybe.Nothing 20 20)
 
 mySnake = 
   [
-    {
-      x = 3
-      , y = 2
-    },
-    {
-      x = 2
-      , y = 2
-    },
-    {
-      x = 2
-      , y = 1
-    },
-    {
-      x = 1
-      , y = 1
-    },
-    {
-      x = 0
-      , y = 1
-    },
-    {
-      x = 0
-      , y = 0
+    { x = 1
+    , y = 1
     }
   ]
   |> Array.fromList
@@ -45,15 +40,32 @@ mySnake =
 model = 
   {
     snake = mySnake,
-    matrix = myMatrix
+    matrix = myMatrix,
+    dir = DOWN,
+    isEating = False,
+    lockKeys = False,
+    food = 
+      { x = 10
+      , y = 2
+      }
   }
 
-setPointsInMatrix data matrix =
-  Array.foldr setPointInMatrix matrix data
-    
-setPointInMatrix coords matrix =
-  Matrix.set coords.x coords.y 1 matrix
+init = 
+  (model, Cmd.none)
 
+subscriptions model =
+  Sub.batch 
+  [ Time.every (second / 6) Tick
+  , Keyboard.ups Key
+  ]
+  
+
+setPointsInMatrix data value matrix =
+  Array.foldr 
+    (\coords matrix -> Matrix.set coords.x coords.y value matrix)  
+    matrix 
+    data
+    
 move dir snake matrix =
   let
     firstPart = Maybe.withDefault  {x = -1, y = -1} (Array.get 0 snake)
@@ -68,6 +80,26 @@ move dir snake matrix =
       Array.indexedMap mapper snake
     else
       snake
+
+addPart dir snake =
+    let 
+      snakeLength =
+        Array.length snake
+      lastPart = 
+        snake 
+          |> Array.get (snakeLength - 1)  
+     in
+      case lastPart of
+        Maybe.Just part ->
+          let 
+            newPart = 
+              part
+                |> calcNextPos (getOpositeDir dir)
+          in
+            snake
+              |> Array.push newPart
+        Maybe.Nothing -> 
+          snake
 
 canMove dir part parts matrix =
   let 
@@ -86,8 +118,6 @@ canMove dir part parts matrix =
       && notPartOfSnake
 
 
-
-
 calcNextPos dir part =
   case dir of
     DOWN -> 
@@ -101,33 +131,87 @@ calcNextPos dir part =
     
 main : Program Never
 main =
-    App.beginnerProgram 
-        {
-            model = model
-            , view = view
-            , update = update
+    App.program 
+        { init = init
+        , view = view
+        , update = update
+        , subscriptions = subscriptions
         } 
 view model =
+  let 
+    matrix =
+      myMatrix
+        |> setPointsInMatrix (Array.fromList [model.food]) (Maybe.Just FOOD)
+        |> setPointsInMatrix model.snake (Maybe.Just SNAKE)
+  in
+    div [] [
+      drawMatrix matrix
+      -- button [onClick (CHANGE_DIR DOWN)] [text "down"],
+      -- button [onClick (CHANGE_DIR UP)] [text "up"],
+      -- button [onClick (CHANGE_DIR LEFT)] [text "left"],
+      -- button [onClick (CHANGE_DIR RIGHT)] [text "right"]
+    ]
 
-  div [] [
-    drawMatrix (setPointsInMatrix model.snake myMatrix),
-    button [onClick DOWN] [text "down"],
-    button [onClick UP] [text "up"],
-    button [onClick LEFT] [text "left"],
-    button [onClick RIGHT] [text "right"]
-  ]
-  
+getOpositeDir dir = 
+  case dir of 
+    LEFT -> RIGHT
+    RIGHT -> LEFT
+    UP -> DOWN
+    DOWN -> UP
+
 
 update msg model =
     case msg of 
-        DOWN ->
-            {model | snake = move DOWN model.snake model.matrix}
-        UP ->
-            {model | snake = move UP model.snake model.matrix}
-        LEFT ->
-            {model | snake = move LEFT model.snake model.matrix}
-        RIGHT ->
-            {model | snake = move RIGHT model.snake model.matrix}
+        NewFood coords ->
+          let 
+            newFood = 
+              { x = (fst coords)
+              , y = (snd coords) 
+              }
+          in
+            ({model | food = newFood}, Cmd.none)
+        Tick time ->
+          let 
+            maxY = 
+              (Matrix.height model.matrix) - 1
+            maxX = 
+              (Matrix.width model.matrix) - 1
+            firstPart = 
+              Maybe.withDefault {x = -1, y = -1} (Array.get 0 model.snake)
+            isEating =
+              firstPart.x == model.food.x && firstPart.y == model.food.y
+            cmd =
+              if isEating == True then
+                Random.generate NewFood (Random.pair (Random.int 0 maxX) (Random.int 0 maxY))
+              else
+                Cmd.none
+            snake = 
+              if model.isEating == True then
+                let 
+                  newSnake = 
+                    addPart model.dir model.snake
+                in
+                  move model.dir newSnake model.matrix 
+              else 
+                move model.dir model.snake model.matrix
+          in
+            ({model | snake = snake, isEating = isEating, lockKeys = False}, cmd)
+        Key keyCode -> 
+            let 
+              dir =
+                keyCodeToDir keyCode
+            in
+              case dir of
+                Maybe.Just dir ->
+                  if (getOpositeDir model.dir) == dir then
+                    (model, Cmd.none)
+                  else   
+                    if model.lockKeys == True then
+                      (model, Cmd.none)
+                    else 
+                      ({model | dir = dir, lockKeys = True}, Cmd.none)
+                Maybe.Nothing -> 
+                  (model, Cmd.none)
 
 drawMatrix matrix = 
   table [] 
@@ -140,10 +224,13 @@ drawMatrixRow row =
 drawMatrixCell cell =
   let 
     color =
-      if cell == 1 then
-        "black"
-      else
-        "lightgrey"
+      case cell of
+        Maybe.Just item ->
+          case item of 
+            SNAKE -> "black"
+            FOOD -> "red"
+        Maybe.Nothing ->
+          "lightgrey"
   in   
     td [style[
                 ("backgroundColor", color), 
