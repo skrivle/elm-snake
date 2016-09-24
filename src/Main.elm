@@ -43,6 +43,7 @@ type alias Model =
   , snake : Snake
   }
 
+
 main : Program Never
 main =
     App.program 
@@ -51,9 +52,12 @@ main =
         , update = update
         , subscriptions = subscriptions
         } 
+
+
 init : (Model, Cmd a)
 init = 
   (model, Cmd.none)
+
 
 model : Model
 model = 
@@ -73,12 +77,14 @@ model =
     }
   }
 
+
 subscriptions : a -> Sub Msg
 subscriptions model =
   Sub.batch 
   [ Time.every (second / 6) Tick
   , Keyboard.ups Key
   ]
+
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -133,6 +139,8 @@ update msg model =
                       ({model | dir = dir, lockKeys = True}, Cmd.none)
                 Maybe.Nothing -> 
                   (model, Cmd.none)
+
+
 view : Model -> Html Msg
 view model =
   let  
@@ -151,11 +159,13 @@ drawMatrix matrix =
   table [] 
     (Array.toList (Array.map drawMatrixRow matrix))
 
+
 drawMatrixRow : Matrix.MatrixRow (Maybe GameItem) -> Html Msg
 drawMatrixRow row =
   tr []
     (Array.toList (Array.map drawMatrixCell row))
-  
+
+
 drawMatrixCell : Maybe GameItem -> Html Msg
 drawMatrixCell cell =
   let 
@@ -174,6 +184,7 @@ drawMatrixCell cell =
                 ("width", "20px")
     ]] []
 
+
 keyCodeToDir : Int -> Maybe Dir
 keyCodeToDir keyCode =
   case keyCode of
@@ -183,12 +194,14 @@ keyCodeToDir keyCode =
     39 -> Maybe.Just RIGHT
     _ -> Maybe.Nothing
 
+
 setPointsInMatrix : Array.Array Coord -> a -> Matrix.Matrix a -> Matrix.Matrix a 
 setPointsInMatrix data value matrix =
   Array.foldr 
     (\coords matrix -> Matrix.set coords.x coords.y value matrix)  
     matrix 
     data
+
 
 move : Dir -> Snake -> Matrix.Matrix a -> Snake    
 move dir snake matrix =
@@ -205,6 +218,7 @@ move dir snake matrix =
       Array.indexedMap mapper snake
     else
       snake
+
 
 addPart : Dir -> Snake -> Snake
 addPart dir snake =
@@ -226,6 +240,7 @@ addPart dir snake =
               |> Array.push newPart
         Maybe.Nothing -> 
           snake
+
 
 canMove : Dir -> SnakePart -> Snake -> Matrix.Matrix a -> Bool
 canMove dir snakePart snake matrix =
@@ -256,6 +271,7 @@ calcNextPos dir snakePart =
       {snakePart | x = snakePart.x - 1}
     RIGHT -> 
       {snakePart | x = snakePart.x + 1}
+    
     
 getOpositeDir : Dir -> Dir
 getOpositeDir dir = 
