@@ -1,10 +1,9 @@
-module Matrix exposing (matrix, Matrix, set, width, height)
+module Matrix exposing (matrix, Matrix, MatrixRow, set, width, height)
 
 import Array exposing (Array)
 
 type alias Matrix a = Array (MatrixRow a)
 type alias MatrixRow a = Array a
-
 
 matrix: a -> Int -> Int -> Matrix a
 matrix value w h = 
@@ -14,7 +13,6 @@ matrix value w h =
 set: Int -> Int -> a -> Matrix a -> Matrix a
 set x y value matrix =
     let 
-
         mapCell index cell =
             if index == x then
                 value
@@ -26,9 +24,10 @@ set x y value matrix =
                 Array.indexedMap mapCell row 
             else 
                 row
-
     in 
-        Array.indexedMap mapRows matrix  
+        Array.indexedMap mapRows matrix
+
+
 
 indexedMap : (Int -> Int -> a -> b) -> Matrix a -> Matrix b  
 indexedMap cellFn matrix =

@@ -7,128 +7,42 @@ import Time exposing (Time, second)
 import Keyboard
 import Random
 
-type Msg = Tick Time | Key Int | NewFood (Int, Int)
+type Msg = 
+  Tick Time 
+  | Key Int 
+  | NewFood (Int, Int)
 
-type DIR = DOWN | UP | LEFT | RIGHT
+type Dir = 
+  DOWN 
+  | UP 
+  | LEFT 
+  | RIGHT
 
-type MatrixItem = SNAKE | FOOD
+type GameItem = 
+  Snake 
+  | Food
 
-type alias SnakePart = 
-  { x : Int
-  , y : Int
+type alias Coord =
+  { x: Int
+  , y: Int
   }
 
-keyCodeToDir keyCode =
-  case keyCode of
-    40 -> Maybe.Just DOWN
-    38 -> Maybe.Just UP
-    37 -> Maybe.Just LEFT
-    39 -> Maybe.Just RIGHT
-    _ -> Maybe.Nothing
+type alias Food = Coord
 
-myMatrix =
-    (Matrix.matrix Maybe.Nothing 20 20)
+type alias SnakePart = Coord
 
-mySnake = 
-  [
-    { x = 1
-    , y = 1
-    }
-  ]
-  |> Array.fromList
+type alias Snake =
+  Array.Array SnakePart
 
-model = 
-  {
-    snake = mySnake,
-    matrix = myMatrix,
-    dir = DOWN,
-    isEating = False,
-    lockKeys = False,
-    food = 
-      { x = 10
-      , y = 2
-      }
+type alias Model =
+  { dir : Dir
+  , food : Food
+  , isEating : Bool
+  , lockKeys : Bool
+  , matrix : Matrix.Matrix (Maybe GameItem)
+  , snake : Snake
   }
 
-init = 
-  (model, Cmd.none)
-
-subscriptions model =
-  Sub.batch 
-  [ Time.every (second / 6) Tick
-  , Keyboard.ups Key
-  ]
-  
-
-setPointsInMatrix data value matrix =
-  Array.foldr 
-    (\coords matrix -> Matrix.set coords.x coords.y value matrix)  
-    matrix 
-    data
-    
-move dir snake matrix =
-  let
-    firstPart = Maybe.withDefault  {x = -1, y = -1} (Array.get 0 snake)
-    isAbleToMove = canMove dir firstPart snake matrix
-    mapper index part = 
-      if index == 0 then 
-        calcNextPos dir part
-      else 
-        Maybe.withDefault {x = -1, y = -1} (Array.get (index - 1) snake)
-  in 
-    if isAbleToMove == True then
-      Array.indexedMap mapper snake
-    else
-      snake
-
-addPart dir snake =
-    let 
-      snakeLength =
-        Array.length snake
-      lastPart = 
-        snake 
-          |> Array.get (snakeLength - 1)  
-     in
-      case lastPart of
-        Maybe.Just part ->
-          let 
-            newPart = 
-              part
-                |> calcNextPos (getOpositeDir dir)
-          in
-            snake
-              |> Array.push newPart
-        Maybe.Nothing -> 
-          snake
-
-canMove dir part parts matrix =
-  let 
-    newPos = calcNextPos dir part
-    maxY = (Matrix.height matrix) - 1
-    maxX = (Matrix.width matrix) - 1
-    notPartOfSnake = 
-      parts
-        |> Array.filter (\n -> n.x == newPos.x && n.y == newPos.y)
-        |> Array.isEmpty
-  in
-    newPos.x <= maxX  
-      && newPos.x >= 0
-      && newPos.y <= maxY
-      && newPos.y >= 0
-      && notPartOfSnake
-
-
-calcNextPos dir part =
-  case dir of
-    DOWN -> 
-      {part | y = part.y + 1}
-    UP -> 
-      {part | y = part.y - 1}
-    LEFT -> 
-      {part | x = part.x - 1}
-    RIGHT -> 
-      {part | x = part.x + 1}
-    
 main : Program Never
 main =
     App.program 
@@ -137,29 +51,36 @@ main =
         , update = update
         , subscriptions = subscriptions
         } 
-view model =
-  let 
-    matrix =
-      myMatrix
-        |> setPointsInMatrix (Array.fromList [model.food]) (Maybe.Just FOOD)
-        |> setPointsInMatrix model.snake (Maybe.Just SNAKE)
-  in
-    div [] [
-      drawMatrix matrix
-      -- button [onClick (CHANGE_DIR DOWN)] [text "down"],
-      -- button [onClick (CHANGE_DIR UP)] [text "up"],
-      -- button [onClick (CHANGE_DIR LEFT)] [text "left"],
-      -- button [onClick (CHANGE_DIR RIGHT)] [text "right"]
-    ]
+init : (Model, Cmd a)
+init = 
+  (model, Cmd.none)
 
-getOpositeDir dir = 
-  case dir of 
-    LEFT -> RIGHT
-    RIGHT -> LEFT
-    UP -> DOWN
-    DOWN -> UP
+model : Model
+model = 
+  { snake = 
+    [
+      { x = 1
+      , y = 1
+      }
+    ] |> Array.fromList
+  , matrix = (Matrix.matrix Maybe.Nothing 20 20)
+  , dir = DOWN
+  , isEating = False
+  , lockKeys = False
+  , food = 
+    { x = 10
+    , y = 2
+    }
+  }
 
+subscriptions : a -> Sub Msg
+subscriptions model =
+  Sub.batch 
+  [ Time.every (second / 6) Tick
+  , Keyboard.ups Key
+  ]
 
+update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of 
         NewFood coords ->
@@ -212,23 +133,38 @@ update msg model =
                       ({model | dir = dir, lockKeys = True}, Cmd.none)
                 Maybe.Nothing -> 
                   (model, Cmd.none)
+view : Model -> Html Msg
+view model =
+  let  
+    matrix =
+      model.matrix
+        |> setPointsInMatrix (Array.fromList [model.food]) (Maybe.Just Food)
+        |> setPointsInMatrix model.snake (Maybe.Just Snake)
+  in
+    div [] [
+      drawMatrix matrix
+    ]
 
+
+drawMatrix : Matrix.Matrix (Maybe GameItem) -> Html Msg
 drawMatrix matrix = 
   table [] 
     (Array.toList (Array.map drawMatrixRow matrix))
-  
+
+drawMatrixRow : Matrix.MatrixRow (Maybe GameItem) -> Html Msg
 drawMatrixRow row =
   tr []
     (Array.toList (Array.map drawMatrixCell row))
   
+drawMatrixCell : Maybe GameItem -> Html Msg
 drawMatrixCell cell =
   let 
     color =
       case cell of
         Maybe.Just item ->
           case item of 
-            SNAKE -> "black"
-            FOOD -> "red"
+            Snake -> "black"
+            Food -> "red"
         Maybe.Nothing ->
           "lightgrey"
   in   
@@ -236,4 +172,95 @@ drawMatrixCell cell =
                 ("backgroundColor", color), 
                 ("height", "20px"), 
                 ("width", "20px")
-    ]] []  
+    ]] []
+
+keyCodeToDir : Int -> Maybe Dir
+keyCodeToDir keyCode =
+  case keyCode of
+    40 -> Maybe.Just DOWN
+    38 -> Maybe.Just UP
+    37 -> Maybe.Just LEFT
+    39 -> Maybe.Just RIGHT
+    _ -> Maybe.Nothing
+
+setPointsInMatrix : Array.Array Coord -> a -> Matrix.Matrix a -> Matrix.Matrix a 
+setPointsInMatrix data value matrix =
+  Array.foldr 
+    (\coords matrix -> Matrix.set coords.x coords.y value matrix)  
+    matrix 
+    data
+
+move : Dir -> Snake -> Matrix.Matrix a -> Snake    
+move dir snake matrix =
+  let
+    firstPart = Maybe.withDefault  {x = -1, y = -1} (Array.get 0 snake)
+    isAbleToMove = canMove dir firstPart snake matrix
+    mapper index part = 
+      if index == 0 then 
+        calcNextPos dir part
+      else 
+        Maybe.withDefault {x = -1, y = -1} (Array.get (index - 1) snake)
+  in 
+    if isAbleToMove == True then
+      Array.indexedMap mapper snake
+    else
+      snake
+
+addPart : Dir -> Snake -> Snake
+addPart dir snake =
+    let 
+      snakeLength =
+        Array.length snake
+      lastPart = 
+        snake 
+          |> Array.get (snakeLength - 1)  
+     in
+      case lastPart of
+        Maybe.Just part ->
+          let 
+            newPart = 
+              part
+                |> calcNextPos (getOpositeDir dir)
+          in
+            snake
+              |> Array.push newPart
+        Maybe.Nothing -> 
+          snake
+
+canMove : Dir -> SnakePart -> Snake -> Matrix.Matrix a -> Bool
+canMove dir snakePart snake matrix =
+  let 
+    newPos = calcNextPos dir snakePart
+    maxY = (Matrix.height matrix) - 1
+    maxX = (Matrix.width matrix) - 1
+    notPartOfSnake = 
+      snake
+        |> Array.filter (\n -> n.x == newPos.x && n.y == newPos.y)
+        |> Array.isEmpty
+  in
+    newPos.x <= maxX  
+      && newPos.x >= 0
+      && newPos.y <= maxY
+      && newPos.y >= 0
+      && notPartOfSnake
+
+
+calcNextPos : Dir -> SnakePart -> SnakePart
+calcNextPos dir snakePart =
+  case dir of
+    DOWN -> 
+      {snakePart | y = snakePart.y + 1}
+    UP -> 
+      {snakePart | y = snakePart.y - 1}
+    LEFT -> 
+      {snakePart | x = snakePart.x - 1}
+    RIGHT -> 
+      {snakePart | x = snakePart.x + 1}
+    
+getOpositeDir : Dir -> Dir
+getOpositeDir dir = 
+  case dir of 
+    LEFT -> RIGHT
+    RIGHT -> LEFT
+    UP -> DOWN
+    DOWN -> UP
