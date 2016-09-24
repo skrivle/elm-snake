@@ -1,4 +1,5 @@
 import Html exposing (..)
+import Html.Events exposing (onClick)
 import Html.Attributes exposing (..)
 import Html.App as App
 import Matrix
@@ -6,11 +7,13 @@ import Array
 import Time exposing (Time, second)
 import Keyboard
 import Random
+import String
 
 type Msg = 
   Tick Time 
   | Key Int 
   | NewFood (Int, Int)
+  | StartPlaying
 
 type Dir = 
   DOWN 
@@ -40,7 +43,9 @@ type alias Model =
   , isEating : Bool
   , lockKeys : Bool
   , matrix : Matrix.Matrix (Maybe GameItem)
+  , playing : Bool
   , snake : Snake
+  , score : Int
   }
 
 
@@ -53,14 +58,13 @@ main =
         , subscriptions = subscriptions
         } 
 
-
 init : (Model, Cmd a)
 init = 
-  (model, Cmd.none)
+  (initialModel, Cmd.none)
 
 
-model : Model
-model = 
+initialModel : Model
+initialModel = 
   { snake = 
     [
       { x = 1
@@ -71,6 +75,8 @@ model =
   , dir = DOWN
   , isEating = False
   , lockKeys = False
+  , playing = False
+  , score = 0
   , food = 
     { x = 10
     , y = 2
@@ -78,10 +84,13 @@ model =
   }
 
 
-subscriptions : a -> Sub Msg
+subscriptions : Model -> Sub Msg
 subscriptions model =
   Sub.batch 
-  [ Time.every (second / 6) Tick
+  [ if model.playing then 
+      Time.every (second / 6) Tick
+    else 
+      Sub.none
   , Keyboard.ups Key
   ]
 
@@ -89,6 +98,8 @@ subscriptions model =
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
     case msg of 
+        StartPlaying -> 
+          ({model | playing = True}, Cmd.none)
         NewFood coords ->
           let 
             newFood = 
@@ -121,8 +132,18 @@ update msg model =
                   move model.dir newSnake model.matrix 
               else 
                 move model.dir model.snake model.matrix
+            newScore =
+              if model.isEating == True then 
+                model.score + 1
+              else
+                model.score
           in
-            ({model | snake = snake, isEating = isEating, lockKeys = False}, cmd)
+            case snake of
+              Maybe.Just snake -> 
+                ({model | snake = snake, isEating = isEating, lockKeys = False, score = newScore}, cmd)
+              Maybe.Nothing ->
+                (initialModel, cmd)
+
         Key keyCode -> 
             let 
               dir =
@@ -148,10 +169,21 @@ view model =
       model.matrix
         |> setPointsInMatrix (Array.fromList [model.food]) (Maybe.Just Food)
         |> setPointsInMatrix model.snake (Maybe.Just Snake)
+    score = 
+      String.append "Score:" (toString model.score)
   in
-    div [] [
-      drawMatrix matrix
-    ]
+    if model.playing then 
+      div [] 
+        [
+        drawMatrix matrix
+        , div [] [
+          text score 
+          ]
+        ]
+    else 
+      button [onClick StartPlaying] [
+        text "Start playing"
+      ]
 
 
 drawMatrix : Matrix.Matrix (Maybe GameItem) -> Html Msg
@@ -203,7 +235,7 @@ setPointsInMatrix data value matrix =
     data
 
 
-move : Dir -> Snake -> Matrix.Matrix a -> Snake    
+move : Dir -> Snake -> Matrix.Matrix a -> Maybe Snake    
 move dir snake matrix =
   let
     firstPart = Maybe.withDefault  {x = -1, y = -1} (Array.get 0 snake)
@@ -215,9 +247,10 @@ move dir snake matrix =
         Maybe.withDefault {x = -1, y = -1} (Array.get (index - 1) snake)
   in 
     if isAbleToMove == True then
-      Array.indexedMap mapper snake
+      Maybe.Just 
+        (Array.indexedMap mapper snake)
     else
-      snake
+      Maybe.Nothing
 
 
 addPart : Dir -> Snake -> Snake
@@ -272,7 +305,7 @@ calcNextPos dir snakePart =
     RIGHT -> 
       {snakePart | x = snakePart.x + 1}
     
-    
+
 getOpositeDir : Dir -> Dir
 getOpositeDir dir = 
   case dir of 
