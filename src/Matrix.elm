@@ -1,14 +1,24 @@
-module Matrix exposing (matrix, Matrix, MatrixRow, set, width, height)
+module Matrix exposing (Matrix, MatrixRow, MatrixDimensions, matrix, set, width, height, dimensions)
 
 import Array exposing (Array)
 
-type alias Matrix a = Array (MatrixRow a)
-type alias MatrixRow a = Array a
+type alias Matrix a = 
+    Array (MatrixRow a)
+
+type alias MatrixRow a = 
+    Array a
+
+type alias MatrixDimensions = 
+    { width : Int
+    , height : Int
+    }
+
 
 matrix: a -> Int -> Int -> Matrix a
 matrix value w h = 
     Array.repeat h 
         (Array.repeat w value)
+
 
 set: Int -> Int -> a -> Matrix a -> Matrix a
 set x y value matrix =
@@ -28,7 +38,6 @@ set x y value matrix =
         Array.indexedMap mapRows matrix
 
 
-
 indexedMap : (Int -> Int -> a -> b) -> Matrix a -> Matrix b  
 indexedMap cellFn matrix =
     let 
@@ -40,6 +49,7 @@ indexedMap cellFn matrix =
     in
         Array.indexedMap mapRows matrix 
 
+
 map: (a -> b) -> Matrix a -> Matrix b
 map cellFn matrix =
     let 
@@ -48,10 +58,17 @@ map cellFn matrix =
     in
         indexedMap cellFnWrapper matrix 
 
-
+width : Matrix a -> Int
 width matrix =
     Maybe.withDefault (Array.fromList []) (Array.get 0 matrix)
         |> Array.length
 
+height : Matrix a -> Int
 height matrix = 
     Array.length matrix
+
+dimensions : Matrix a -> MatrixDimensions
+dimensions matrix =
+    { width = (width matrix)
+    , height = (height matrix) 
+    }    
