@@ -27,11 +27,6 @@ move dir snake dimensions =
   let
     isAbleToMove = 
       canMove dir (head snake) snake dimensions
-    -- mapper index part = 
-    --   if index == 0 then 
-    --     calcNextPos dir part
-    --   else 
-    --     Maybe.withDefault fallbackPart (Array.get (index - 1) snake)
   in 
     if isAbleToMove == True then
       snake
